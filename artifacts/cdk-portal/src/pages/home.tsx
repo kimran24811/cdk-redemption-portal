@@ -124,24 +124,50 @@ export default function Home() {
 
   const handleValidateJson = () => {
     setJsonError("");
+
+    let parsed: Record<string, unknown>;
     try {
-      const parsed = JSON.parse(jsonText);
-      const token =
-        parsed.accessToken ||
-        parsed.access_token ||
-        parsed.token ||
-        parsed.user?.id;
-      if (!token) {
-        setJsonError(
-          "Could not find 'accessToken' in the JSON. Make sure you copied the full page content."
-        );
-        return;
-      }
-      setUserToken(token);
-      setCurrentStep(3);
+      parsed = JSON.parse(jsonText);
     } catch {
       setJsonError("Invalid JSON. Please copy the entire JSON content from the AuthSession page.");
+      return;
     }
+
+    // Recursively search for a JWT-looking value in the object
+    function findJwt(obj: unknown, depth = 0): string | null {
+      if (depth > 5 || !obj || typeof obj !== "object") return null;
+      for (const [, val] of Object.entries(obj as Record<string, unknown>)) {
+        if (typeof val === "string" && isValidJwt(val)) return val;
+        if (typeof val === "object") {
+          const found = findJwt(val, depth + 1);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function isValidJwt(str: string): boolean {
+      const parts = str.split(".");
+      if (parts.length !== 3) return false;
+      const b64url = /^[A-Za-z0-9_-]+$/;
+      return parts.every((p) => b64url.test(p) && p.length > 10);
+    }
+
+    // First try known fields, then fall back to deep JWT search
+    const rawToken =
+      (parsed.accessToken as string | undefined) ||
+      (parsed.access_token as string | undefined) ||
+      ((parsed.user as Record<string, unknown>)?.id as string | undefined);
+
+    const token = rawToken && isValidJwt(rawToken) ? rawToken : findJwt(parsed);
+
+    if (!token) {
+      setJsonError("Invalid token. Please get a new one.");
+      return;
+    }
+
+    setUserToken(token);
+    setCurrentStep(3);
   };
 
   const handleActivate = () => {
