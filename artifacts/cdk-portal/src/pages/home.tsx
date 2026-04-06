@@ -18,6 +18,8 @@ import {
   Info,
   CheckCircle2,
   XCircle,
+  Mail,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +33,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 
 function StepCircle({
   step,
@@ -70,6 +76,7 @@ export default function Home() {
   const [jsonError, setJsonError] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
   const [ordersOpen, setOrdersOpen] = useState<boolean>(false);
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
 
   const { data: balanceData } = useGetBalance();
   const { data: ordersData } = useGetOrders({ per_page: 5 });
@@ -138,13 +145,23 @@ export default function Home() {
   };
 
   const handleActivate = () => {
-    activateMutation.mutate({
-      data: {
-        key: cdkKey.trim(),
-        user_token: userToken,
-        async: false,
+    activateMutation.mutate(
+      {
+        data: {
+          key: cdkKey.trim(),
+          user_token: userToken,
+          async: false,
+        },
       },
-    });
+      {
+        onSuccess: (res: unknown) => {
+          const r = res as { success?: boolean };
+          if (r?.success) {
+            setShowSuccessModal(true);
+          }
+        },
+      }
+    );
   };
 
   const handleReset = () => {
@@ -155,6 +172,7 @@ export default function Home() {
     setCurrentStep(1);
     validateMutation.reset();
     activateMutation.reset();
+    setShowSuccessModal(false);
   };
 
   const activationResult = activateMutation.data as unknown as {
@@ -172,7 +190,8 @@ export default function Home() {
   } | undefined;
 
   const isPending = activateMutation.isPending;
-  const showActivationResult = !!activationResult;
+  // Only show inline result card for failures; successes are handled by the modal
+  const showActivationResult = !!activationResult && !activationResult?.success;
 
   const progressPct =
     currentStep === 1 ? 0 : currentStep === 2 ? 50 : 100;
@@ -668,6 +687,69 @@ export default function Home() {
           </Collapsible>
         )}
       </main>
+
+      {/* Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={(open) => { if (!open) setShowSuccessModal(false); }}>
+        <DialogContent
+          className="sm:max-w-sm bg-[#0d1117] border-border/40 p-0 overflow-hidden"
+          data-testid="modal-activation-success"
+        >
+          <div className="flex flex-col items-center px-8 pt-10 pb-8 gap-5 text-center">
+            {/* Green glow checkmark */}
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-24 h-24 rounded-full bg-green-500/20 blur-xl" />
+              <div className="relative w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-[0_0_40px_rgba(34,197,94,0.5)]">
+                <Check className="w-9 h-9 text-white stroke-[3]" />
+              </div>
+            </div>
+
+            {/* Title */}
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-white">
+                Activation Successful!
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Your subscription has been activated successfully.
+              </p>
+            </div>
+
+            {/* Email pill */}
+            {activationResult?.data?.email && (
+              <div className="flex items-center gap-2.5 px-5 py-3 rounded-full border border-green-500/40 bg-green-500/10 text-green-400 font-medium text-sm w-full justify-center">
+                <Mail className="w-4 h-4 shrink-0" />
+                <span data-testid="modal-activated-email">{activationResult.data.email}</span>
+              </div>
+            )}
+
+            {/* Subscription info */}
+            {activationResult?.data?.subscription && (
+              <p className="text-xs text-muted-foreground">
+                {activationResult.data.subscription}
+              </p>
+            )}
+
+            {/* Buttons */}
+            <div className="flex gap-3 w-full pt-1">
+              <Button
+                variant="secondary"
+                className="flex-1 h-12 text-base font-semibold bg-secondary/70 hover:bg-secondary"
+                onClick={() => setShowSuccessModal(false)}
+                data-testid="modal-button-close"
+              >
+                Close
+              </Button>
+              <Button
+                className="flex-1 h-12 text-base font-semibold bg-green-500 hover:bg-green-600 text-white gap-2"
+                onClick={handleReset}
+                data-testid="modal-button-one-more"
+              >
+                <RefreshCw className="w-4 h-4" />
+                One More
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
