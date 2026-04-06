@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, cp } from "node:fs/promises";
+import { execSync } from "node:child_process";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -120,7 +121,30 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   });
 }
 
-buildAll().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+async function buildFrontend() {
+  const workspaceRoot = path.resolve(artifactDir, "..", "..");
+  const portalDir = path.resolve(workspaceRoot, "artifacts", "cdk-portal");
+  const portalDist = path.resolve(portalDir, "dist", "public");
+  const serverPublic = path.resolve(artifactDir, "dist", "public");
+
+  console.log("Building frontend (cdk-portal)...");
+  execSync(
+    "pnpm --filter @workspace/cdk-portal run build",
+    {
+      cwd: workspaceRoot,
+      stdio: "inherit",
+      env: { ...process.env, BASE_PATH: "/", NODE_ENV: "production" },
+    },
+  );
+
+  console.log("Copying frontend build to server dist/public...");
+  await cp(portalDist, serverPublic, { recursive: true });
+  console.log("Frontend build copied.");
+}
+
+buildAll()
+  .then(() => buildFrontend())
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

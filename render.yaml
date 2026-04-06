@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cdk-redemption-portal
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: pnpm install && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: KEYS_OVH_API_KEY
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true

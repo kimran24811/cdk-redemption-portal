@@ -1,6 +1,9 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -30,5 +33,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Serve the built frontend in production (placed next to the server bundle)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const staticDir = join(__dirname, "public");
+if (existsSync(staticDir)) {
+  app.use(express.static(staticDir));
+  app.get("*", (_req, res) => {
+    res.sendFile(join(staticDir, "index.html"));
+  });
+}
 
 export default app;
