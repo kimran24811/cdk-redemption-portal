@@ -199,11 +199,13 @@ router.post("/keys/activate", async (req, res) => {
   }
 
   try {
-    const { status, data } = await keysOvhFetch("/activate", {
+    const { data } = await keysOvhFetch("/activate", {
       method: "POST",
       body: JSON.stringify(parsed.data),
     });
-    res.status(status).json(data);
+    // Always return 200 so the client can read the response body regardless of
+    // what status code keys.ovh used (e.g. 404 for key-not-found).
+    res.status(200).json(data);
   } catch (err) {
     req.log.error({ err }, "Failed to activate key");
     res.status(500).json({ success: false, error: "Failed to activate key" });
