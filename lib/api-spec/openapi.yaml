@@ -1,0 +1,522 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: keys
+    description: CDK key management via keys.ovh
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /keys/validate:
+    post:
+      operationId: validateKey
+      tags: [keys]
+      summary: Validate a CDK key
+      description: Checks if a CDK key is valid, already used, or invalid without consuming it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateKeyBody"
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateKeyResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/products:
+    get:
+      operationId: getProducts
+      tags: [keys]
+      summary: Get available products
+      description: Returns a list of available products with subscription types, prices, and stock status
+      responses:
+        "200":
+          description: Products list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/balance:
+    get:
+      operationId: getBalance
+      tags: [keys]
+      summary: Get account balance
+      description: Returns the current account balance
+      responses:
+        "200":
+          description: Balance info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/activate:
+    post:
+      operationId: activateKey
+      tags: [keys]
+      summary: Activate a CDK key
+      description: Activates a purchased key using the keys.ovh API
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivateKeyBody"
+      responses:
+        "200":
+          description: Activation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivationResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/orders:
+    get:
+      operationId: getOrders
+      tags: [keys]
+      summary: Get purchase orders
+      description: Returns a paginated list of API purchase orders
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Orders list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrdersResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/orders/{orderNumber}:
+    get:
+      operationId: getOrder
+      tags: [keys]
+      summary: Get a specific order
+      description: Returns details of a specific order including purchased keys
+      parameters:
+        - name: orderNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/purchase:
+    post:
+      operationId: purchaseKeys
+      tags: [keys]
+      summary: Purchase activation keys
+      description: Purchase activation keys using account balance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseKeysBody"
+      responses:
+        "200":
+          description: Purchase result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - success
+        - error
+    VolumePrice:
+      type: object
+      properties:
+        min_qty:
+          type: integer
+        price:
+          type: number
+      required:
+        - min_qty
+        - price
+    SubscriptionType:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        duration_days:
+          type: integer
+        price:
+          type: number
+        volume_prices:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumePrice"
+        in_stock:
+          type: boolean
+      required:
+        - slug
+        - name
+        - duration_days
+        - price
+        - in_stock
+    Product:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        subscription_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionType"
+      required:
+        - slug
+        - name
+        - subscription_types
+    ProductsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+      required:
+        - success
+        - data
+    BalanceData:
+      type: object
+      properties:
+        balance:
+          type: number
+        currency:
+          type: string
+      required:
+        - balance
+        - currency
+    BalanceResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/BalanceData"
+      required:
+        - success
+        - data
+    ValidateKeyBody:
+      type: object
+      properties:
+        key:
+          type: string
+          description: The CDK activation key to validate
+      required:
+        - key
+    ValidateKeyResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [valid, already_used, invalid]
+        product:
+          type: string
+        subscription:
+          type: string
+        email:
+          type: string
+        activated_at:
+          type: string
+        message:
+          type: string
+      required:
+        - status
+    ValidateKeyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/ValidateKeyResult"
+      required:
+        - success
+        - data
+    ActivateKeyBody:
+      type: object
+      properties:
+        key:
+          type: string
+          description: The CDK activation key
+        user_token:
+          type: string
+          description: Account access token
+        async:
+          type: boolean
+          description: Use async activation mode
+      required:
+        - key
+        - user_token
+    ActivationData:
+      type: object
+      properties:
+        email:
+          type: string
+        product:
+          type: string
+        subscription:
+          type: string
+        activated_at:
+          type: string
+        task_id:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+        warning:
+          type: string
+    ActivationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/ActivationData"
+        message:
+          type: string
+        warning:
+          type: string
+      required:
+        - success
+    OrderSummary:
+      type: object
+      properties:
+        order_number:
+          type: string
+        product:
+          type: string
+        subscription:
+          type: string
+        quantity:
+          type: integer
+        amount:
+          type: number
+        status:
+          type: string
+        created_at:
+          type: string
+      required:
+        - order_number
+        - product
+        - subscription
+        - quantity
+        - amount
+        - status
+        - created_at
+    OrdersMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+      required:
+        - current_page
+        - last_page
+        - per_page
+        - total
+    OrdersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderSummary"
+        meta:
+          $ref: "#/components/schemas/OrdersMeta"
+      required:
+        - success
+        - data
+    OrderDetail:
+      type: object
+      properties:
+        order_number:
+          type: string
+        product:
+          type: string
+        subscription:
+          type: string
+        quantity:
+          type: integer
+        amount:
+          type: number
+        status:
+          type: string
+        created_at:
+          type: string
+        keys:
+          type: array
+          items:
+            type: string
+        balance_after:
+          type: number
+        duration_days:
+          type: integer
+      required:
+        - order_number
+        - product
+        - subscription
+        - quantity
+        - amount
+        - status
+        - created_at
+    OrderDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/OrderDetail"
+      required:
+        - success
+        - data
+    PurchaseKeysBody:
+      type: object
+      properties:
+        product_slug:
+          type: string
+        subscription_type_slug:
+          type: string
+        quantity:
+          type: integer
+          default: 1
+        idempotency_key:
+          type: string
+      required:
+        - product_slug
+        - subscription_type_slug
+    PurchaseResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/OrderDetail"
+        message:
+          type: string
+      required:
+        - success
