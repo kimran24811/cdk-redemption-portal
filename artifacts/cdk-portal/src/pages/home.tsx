@@ -129,19 +129,6 @@ export default function Home() {
       return;
     }
 
-    // Recursively search for a JWT-looking value in the object
-    function findJwt(obj: unknown, depth = 0): string | null {
-      if (depth > 5 || !obj || typeof obj !== "object") return null;
-      for (const [, val] of Object.entries(obj as Record<string, unknown>)) {
-        if (typeof val === "string" && isValidJwt(val)) return val;
-        if (typeof val === "object") {
-          const found = findJwt(val, depth + 1);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-
     function isValidJwt(str: string): boolean {
       const parts = str.split(".");
       if (parts.length !== 3) return false;
@@ -149,18 +136,20 @@ export default function Home() {
       return parts.every((p) => b64url.test(p) && p.length > 10);
     }
 
-    // First try known fields, then fall back to deep JWT search
+    // The ChatGPT AuthSession page returns JSON with `accessToken` at the root.
+    // Only accept that field — deep search picks up wrong analytics/tracking JWTs.
     const rawToken =
       (parsed.accessToken as string | undefined) ||
-      (parsed.access_token as string | undefined) ||
-      ((parsed.user as Record<string, unknown>)?.id as string | undefined);
+      (parsed.access_token as string | undefined);
 
-    const token = rawToken && isValidJwt(rawToken) ? rawToken : findJwt(parsed);
-
-    if (!token) {
-      setJsonError("Invalid token. Please get a new one.");
+    if (!rawToken || !isValidJwt(rawToken)) {
+      setJsonError(
+        'Could not find "accessToken" in the pasted JSON. Make sure you copied the full page content from the AuthSession link above.'
+      );
       return;
     }
+
+    const token = rawToken;
 
     setUserToken(token);
     setCurrentStep(3);
@@ -456,11 +445,14 @@ export default function Home() {
                     </a>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Open the page below, copy the full JSON content, then paste it and click validate.
-                </p>
+                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                  <li>Click <span className="text-foreground font-medium">Open AuthSession Page</span> above</li>
+                  <li>You will see raw JSON starting with <span className="font-mono text-xs text-primary">{"{"}"user":...</span></li>
+                  <li>Press <span className="text-foreground font-medium">Ctrl+A</span> then <span className="text-foreground font-medium">Ctrl+C</span> to select and copy everything</li>
+                  <li>Paste it below and click <span className="text-foreground font-medium">Validate</span></li>
+                </ol>
                 <Textarea
-                  placeholder="Paste the full JSON from AuthSession page"
+                  placeholder='Paste the full JSON from chatgpt.com/api/auth/session here'
                   value={jsonText}
                   onChange={(e) => setJsonText(e.target.value)}
                   className="font-mono text-xs min-h-[110px] resize-none bg-input/30 border-border/40"
