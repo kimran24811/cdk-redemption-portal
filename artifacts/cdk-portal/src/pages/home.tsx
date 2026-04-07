@@ -121,19 +121,31 @@ export default function Home() {
   const handleValidateJson = () => {
     setJsonError("");
 
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      setJsonError("Invalid JSON. Please copy the entire JSON content from the AuthSession page.");
-      return;
-    }
-
     function isValidJwt(str: string): boolean {
       const parts = str.split(".");
       if (parts.length !== 3) return false;
       const b64url = /^[A-Za-z0-9_-]+$/;
       return parts.every((p) => b64url.test(p) && p.length > 10);
+    }
+
+    const trimmed = jsonText.trim();
+
+    // Allow pasting the raw JWT token directly (no JSON wrapper needed)
+    if (isValidJwt(trimmed)) {
+      setUserToken(trimmed);
+      setCurrentStep(3);
+      return;
+    }
+
+    // Otherwise expect full JSON from chatgpt.com/api/auth/session
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      setJsonError(
+        'Could not read this content. Either paste the full page from the AuthSession link, or paste just the accessToken JWT value.'
+      );
+      return;
     }
 
     // The ChatGPT AuthSession page returns JSON with `accessToken` at the root.
@@ -144,7 +156,7 @@ export default function Home() {
 
     if (!rawToken || !isValidJwt(rawToken)) {
       setJsonError(
-        'Could not find "accessToken" in the pasted JSON. Make sure you copied the full page content from the AuthSession link above.'
+        'Could not find "accessToken" in the pasted content. Open the AuthSession Page link above — it opens a page showing raw JSON. Copy the ENTIRE page (Ctrl+A, Ctrl+C) and paste it here.'
       );
       return;
     }
@@ -446,11 +458,12 @@ export default function Home() {
                   </div>
                 </div>
                 <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                  <li>Click <span className="text-foreground font-medium">Open AuthSession Page</span> above</li>
-                  <li>You will see raw JSON starting with <span className="font-mono text-xs text-primary">{"{"}"user":...</span></li>
-                  <li>Press <span className="text-foreground font-medium">Ctrl+A</span> then <span className="text-foreground font-medium">Ctrl+C</span> to select and copy everything</li>
+                  <li>Click <span className="text-foreground font-medium">Open AuthSession Page</span> — it opens <span className="font-mono text-xs">chatgpt.com/api/auth/session</span></li>
+                  <li>You will see raw JSON (not the ChatGPT chat page) starting with <span className="font-mono text-xs text-primary">&#123;"user":&#123;...</span></li>
+                  <li>Press <span className="text-foreground font-medium">Ctrl+A</span> then <span className="text-foreground font-medium">Ctrl+C</span> to copy the entire page</li>
                   <li>Paste it below and click <span className="text-foreground font-medium">Validate</span></li>
                 </ol>
+                <p className="text-xs text-muted-foreground/70">Advanced: you can also paste just the <span className="font-mono">accessToken</span> JWT value directly.</p>
                 <Textarea
                   placeholder='Paste the full JSON from chatgpt.com/api/auth/session here'
                   value={jsonText}
@@ -629,16 +642,60 @@ export default function Home() {
                         (activateMutation.error as { error?: string })?.error ||
                         "An unexpected error occurred. Please try again."}
                     </p>
+                    {(() => {
+                      const msg = (activationResult?.message || "").toLowerCase();
+                      if (msg.includes("token") || msg.includes("session")) {
+                        return (
+                          <p className="text-sm text-muted-foreground pt-1">
+                            Your session token was rejected. You may have pasted from the wrong page. Open the{" "}
+                            <a
+                              href="https://chatgpt.com/api/auth/session"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline text-primary"
+                            >
+                              AuthSession page
+                            </a>
+                            , press Ctrl+A &rarr; Ctrl+C, then re-paste.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
-                  <Button
-                    className="w-full h-11"
-                    onClick={() => {
-                      activateMutation.reset();
-                    }}
-                    data-testid="button-try-again"
-                  >
-                    Try Again
-                  </Button>
+                  <div className="flex gap-3">
+                    {(() => {
+                      const msg = (activationResult?.message || "").toLowerCase();
+                      if (msg.includes("token") || msg.includes("session")) {
+                        return (
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-11"
+                            onClick={() => {
+                              activateMutation.reset();
+                              setUserToken("");
+                              setJsonText("");
+                              setJsonError("");
+                              setCurrentStep(2);
+                            }}
+                            data-testid="button-fix-session"
+                          >
+                            Fix My Session
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <Button
+                      className="flex-1 h-11"
+                      onClick={() => {
+                        activateMutation.reset();
+                      }}
+                      data-testid="button-try-again"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
                 </>
               )}
             </CardContent>
