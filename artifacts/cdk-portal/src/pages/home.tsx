@@ -128,43 +128,58 @@ export default function Home() {
       return parts.every((p) => b64url.test(p) && p.length > 10);
     }
 
+    // Extract the longest JWT starting with eyJ from any text blob.
+    // ChatGPT accessTokens are RS256 JWTs (very long, typically 1500+ chars).
+    // Tracking/analytics JWTs are much shorter, so longest wins.
+    function extractLongestChatGptJwt(text: string): string | null {
+      const regex = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+      const matches = text.match(regex) ?? [];
+      if (!matches.length) return null;
+      // Sort by length descending — ChatGPT token will be the longest
+      const sorted = [...matches].sort((a, b) => b.length - a.length);
+      const best = sorted[0];
+      // Require a minimum payload length to exclude short tracking tokens
+      return best && best.length > 200 ? best : null;
+    }
+
     const trimmed = jsonText.trim();
 
-    // Allow pasting the raw JWT token directly (no JSON wrapper needed)
+    // 1. User pasted a raw JWT directly
     if (isValidJwt(trimmed)) {
       setUserToken(trimmed);
       setCurrentStep(3);
       return;
     }
 
-    // Otherwise expect full JSON from chatgpt.com/api/auth/session
-    let parsed: Record<string, unknown>;
+    // 2. Try to parse as JSON and look for accessToken at root
+    let parsedToken: string | undefined;
     try {
-      parsed = JSON.parse(trimmed);
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      parsedToken =
+        (parsed.accessToken as string | undefined) ||
+        (parsed.access_token as string | undefined);
     } catch {
-      setJsonError(
-        'Could not read this content. Either paste the full page from the AuthSession link, or paste just the accessToken JWT value.'
-      );
+      // Not JSON — fall through to full-text scan
+    }
+
+    if (parsedToken && isValidJwt(parsedToken)) {
+      setUserToken(parsedToken);
+      setCurrentStep(3);
       return;
     }
 
-    // The ChatGPT AuthSession page returns JSON with `accessToken` at the root.
-    // Only accept that field — deep search picks up wrong analytics/tracking JWTs.
-    const rawToken =
-      (parsed.accessToken as string | undefined) ||
-      (parsed.access_token as string | undefined);
-
-    if (!rawToken || !isValidJwt(rawToken)) {
-      setJsonError(
-        'Could not find "accessToken" in the pasted content. Open the AuthSession Page link above — it opens a page showing raw JSON. Copy the ENTIRE page (Ctrl+A, Ctrl+C) and paste it here.'
-      );
+    // 3. Fallback: scan the entire pasted text for the longest JWT.
+    //    This handles cases where the user copied a page that embeds the token.
+    const scanned = extractLongestChatGptJwt(trimmed);
+    if (scanned) {
+      setUserToken(scanned);
+      setCurrentStep(3);
       return;
     }
 
-    const token = rawToken;
-
-    setUserToken(token);
-    setCurrentStep(3);
+    setJsonError(
+      'Could not find a valid session token in the pasted content. Open the AuthSession Page link above — it opens chatgpt.com/api/auth/session showing raw JSON. Press Ctrl+A then Ctrl+C and paste the full page here.'
+    );
   };
 
   const handleActivate = () => {
