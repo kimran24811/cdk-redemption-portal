@@ -146,6 +146,7 @@ export default function Home() {
 
     // 1. User pasted a raw JWT directly
     if (isValidJwt(trimmed)) {
+      console.log("[CDK] Method: raw JWT, length:", trimmed.length, "prefix:", trimmed.slice(0, 15));
       setUserToken(trimmed);
       setCurrentStep(3);
       return;
@@ -163,6 +164,7 @@ export default function Home() {
     }
 
     if (parsedToken && isValidJwt(parsedToken)) {
+      console.log("[CDK] Method: JSON root accessToken, length:", parsedToken.length, "prefix:", parsedToken.slice(0, 15));
       setUserToken(parsedToken);
       setCurrentStep(3);
       return;
@@ -172,10 +174,13 @@ export default function Home() {
     //    This handles cases where the user copied a page that embeds the token.
     const scanned = extractLongestChatGptJwt(trimmed);
     if (scanned) {
+      console.log("[CDK] Method: longest JWT scan, length:", scanned.length, "prefix:", scanned.slice(0, 15));
       setUserToken(scanned);
       setCurrentStep(3);
       return;
     }
+
+    console.log("[CDK] No JWT found in pasted content, length:", trimmed.length);
 
     setJsonError(
       'Could not find a valid session token in the pasted content. Open the AuthSession Page link above — it opens chatgpt.com/api/auth/session showing raw JSON. Press Ctrl+A then Ctrl+C and paste the full page here.'
@@ -476,9 +481,10 @@ export default function Home() {
                   <li>Click <span className="text-foreground font-medium">Open AuthSession Page</span> — it opens <span className="font-mono text-xs">chatgpt.com/api/auth/session</span></li>
                   <li>You will see raw JSON (not the ChatGPT chat page) starting with <span className="font-mono text-xs text-primary">&#123;"user":&#123;...</span></li>
                   <li>Press <span className="text-foreground font-medium">Ctrl+A</span> then <span className="text-foreground font-medium">Ctrl+C</span> to copy the entire page</li>
-                  <li>Paste it below and click <span className="text-foreground font-medium">Validate</span></li>
+                  <li>Paste it below and click <span className="text-foreground font-medium">Validate</span>, then activate <span className="text-yellow-500 font-medium">immediately</span></li>
                 </ol>
-                <p className="text-xs text-muted-foreground/70">Advanced: you can also paste just the <span className="font-mono">accessToken</span> JWT value directly.</p>
+                <p className="text-xs text-yellow-600 font-medium">⚠ Tokens expire within minutes — copy and activate without delay.</p>
+                <p className="text-xs text-muted-foreground/70">You can also paste just the <span className="font-mono">accessToken</span> JWT value directly.</p>
                 <Textarea
                   placeholder='Paste the full JSON from chatgpt.com/api/auth/session here'
                   value={jsonText}
@@ -662,7 +668,7 @@ export default function Home() {
                       if (msg.includes("token") || msg.includes("session")) {
                         return (
                           <p className="text-sm text-muted-foreground pt-1">
-                            Your session token was rejected. You may have pasted from the wrong page. Open the{" "}
+                            Your session token is <strong>invalid or expired</strong>. Tokens expire quickly — you must get a <strong>fresh one right now</strong>. Click "Fix My Session", open the{" "}
                             <a
                               href="https://chatgpt.com/api/auth/session"
                               target="_blank"
@@ -671,7 +677,7 @@ export default function Home() {
                             >
                               AuthSession page
                             </a>
-                            , press Ctrl+A &rarr; Ctrl+C, then re-paste.
+                            , press Ctrl+A &rarr; Ctrl+C, and paste the new content.
                           </p>
                         );
                       }
